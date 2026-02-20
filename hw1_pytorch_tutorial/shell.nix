@@ -9,9 +9,11 @@ pkgs.mkShellNoCC {
   packages = with pkgs; [
     (python312.withPackages (
       pypkgs: with pypkgs; [
+        jupytext
         torch
         torchvision
         jupyter
+        matplotlib
       ]
     ))
   ];
