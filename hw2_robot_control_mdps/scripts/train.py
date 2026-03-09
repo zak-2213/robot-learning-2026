@@ -15,7 +15,7 @@ def parse_args():
                         help="Number of PPO update iterations")
     parser.add_argument("--save_checkpt_freq", type=int, default=50,
                         help="Checkpoint every N update iterations")
-    parser.add_argument("--device", type=str, default="cpu",
+    parser.add_argument("--device", type=str, default="cuda",
                         help="Torch device (cpu or cuda)")
     return parser.parse_args()
 
