@@ -1,0 +1,6 @@
+datasets/
+checkpoints/
+**/__pycache__/**
+hw3_imitation_learning.egg-info/
+MUJOCO_LOG.TXT
+*.hwresult

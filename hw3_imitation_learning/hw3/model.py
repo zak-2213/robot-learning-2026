@@ -42,26 +42,43 @@ class ObstaclePolicy(BasePolicy):
 
     def __init__(
         self,
+        action_dim: int,
+        state_dim: int,
+        chunk_size: int,
+        d_model: int,
+        depth: int,
     ) -> None:
-        super().__init__()
+        super().__init__(state_dim, action_dim, chunk_size)
+        layers = [nn.Linear(state_dim, d_model), nn.GELU()]
+        for _ in range(depth-2):
+            layers += [nn.Linear(d_model, d_model), nn.GELU()]
+        layers += [nn.Linear(d_model, chunk_size*action_dim)]
+        self.net = nn.Sequential(*layers)
 
     def forward(
         self,
+        x: torch.Tensor,
     ) -> torch.Tensor:
         """Return predicted action chunk of shape (B, chunk_size, action_dim)."""
-        raise NotImplementedError
+        assert x.shape[1] == self.state_dim, f"x should have dim[1] = {self.state_dim} but has {x.size(1)} instead"
+        out = self.net(x)
+        return out.view(x.shape[0], self.chunk_size, self.action_dim)
 
     def compute_loss(
         self,
+        predictions: torch.Tensor,
+        actions: torch.Tensor
     ) -> torch.Tensor:
-        raise NotImplementedError
+        assert predictions.shape == actions.shape, f"Predictions and actions should have the same shape, have shapes {predictions.shape} and {actions.shape} respectively instead"
+        return torch.nn.functional.mse_loss(predictions, actions)
 
     def sample_actions(
         self,
         state: torch.Tensor,
     ) -> torch.Tensor:
-        raise NotImplementedError
-
+        assert state.shape[1] == self.state_dim, f"state should have dim[1] = {self.state_dim} but has {x.size(1)} instead"
+        with torch.no_grad():
+            return self(state)
 
 # TODO: Students implement MultiTaskPolicy here.
 class MultiTaskPolicy(BasePolicy):
@@ -97,12 +114,18 @@ def build_policy(
     *,
     state_dim: int,
     action_dim: int,
+    chunk_size: int,
+    d_model: int = 256,
+    depth: int = 4
 ) -> BasePolicy:
     if policy_type == "obstacle":
         return ObstaclePolicy(
             action_dim=action_dim,
             state_dim=state_dim,
             # TODO: Build with your chosen specifications
+            chunk_size=chunk_size,
+            d_model=d_model,
+            depth=depth
         )
     if policy_type == "multitask":
         return MultiTaskPolicy(

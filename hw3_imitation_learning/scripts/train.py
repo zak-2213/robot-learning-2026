@@ -26,13 +26,15 @@ from hw3.model import BasePolicy, build_policy
 
 # TODO: Any imports you want from torch or other libraries we use. Not allowed: libraries we don't use
 from torch.utils.data import DataLoader, random_split
+import torch.nn.functional as F
 
 # TODO: Choose your own hyperparameters!
-EPOCHS = ... 
-BATCH_SIZE = ...
-LR = ...
+EPOCHS = 300
+BATCH_SIZE = 32
+LR = 3e-5
 VAL_SPLIT = 0.1
-
+DEPTH = 3
+D_MODEL = 768
 
 def train_one_epoch(
     model: BasePolicy,
@@ -48,6 +50,15 @@ def train_one_epoch(
         states, action_chunks = batch
         # TODO: Implement the training step for one batch here.
         # This mostly: Get states and action_chunks onto the correct device, compute the loss, and step the optimizer.
+        states = states.to(device)
+        action_chunks = action_chunks.to(device)
+        predictions = model(states)
+        loss = model.compute_loss(predictions, action_chunks)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+        n_batches += 1
+
 
     return total_loss / max(n_batches, 1)
 
@@ -65,6 +76,13 @@ def evaluate(
     for batch in loader:
         states, action_chunks = batch
         # TODO: Implement the evaluation step for one batch here.
+        states = states.to(device)
+        action_chunks = action_chunks.to(device)
+        predictions = model(states)
+        loss = F.mse_loss(predictions, action_chunks)
+        total_loss += loss.item()
+        n_batches += 1
+
 
     return total_loss / max(n_batches, 1)
 
@@ -112,8 +130,8 @@ def main() -> None:
 
     # ── load data ─────────────────────────────────────────────────────
     zarr_paths = [args.zarr]
-    if args.extra_zarr:
-        zarr_paths.extend(args.extra_zarr)
+    # if args.extra_zarr:
+    #     zarr_paths.extend(args.extra_zarr)
 
     if len(zarr_paths) == 1:
         states, actions, ep_ends = load_zarr(
@@ -160,14 +178,17 @@ def main() -> None:
         state_dim=states.shape[1],
         action_dim=actions.shape[1],
         # TODO: build with your desired specifications
+        chunk_size=args.chunk_size,
+        d_model=D_MODEL,
+        depth=DEPTH
     ).to(device)
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Model parameters: {n_params:,}")
 
     # TODO: implement an optimizer and scheduler
-    # optimizer =
-    # scheduler =
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, EPOCHS)
 
     # ── training loop ─────────────────────────────────────────────────
     best_val = float("inf")
@@ -223,6 +244,8 @@ def main() -> None:
                     "state_dim": int(states.shape[1]),
                     "action_dim": int(actions.shape[1]),
                     "val_loss": val_loss,
+                    "d_model": D_MODEL,
+                    "depth": DEPTH
                 },
                 save_path,
             )
