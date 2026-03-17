@@ -29,11 +29,11 @@ from torch.utils.data import DataLoader, random_split
 import torch.nn.functional as F
 
 # TODO: Choose your own hyperparameters!
-EPOCHS = 300
+EPOCHS = 800
 BATCH_SIZE = 32
-LR = 3e-5
+LR = 3e-6
 VAL_SPLIT = 0.1
-DEPTH = 3
+DEPTH = 6
 D_MODEL = 768
 
 def train_one_epoch(
@@ -79,7 +79,7 @@ def evaluate(
         states = states.to(device)
         action_chunks = action_chunks.to(device)
         predictions = model(states)
-        loss = F.mse_loss(predictions, action_chunks)
+        loss = model.compute_loss(predictions, action_chunks)
         total_loss += loss.item()
         n_batches += 1
 
