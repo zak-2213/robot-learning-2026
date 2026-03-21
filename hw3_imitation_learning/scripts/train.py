@@ -29,11 +29,11 @@ from torch.utils.data import DataLoader, random_split
 import torch.nn.functional as F
 
 # TODO: Choose your own hyperparameters!
-EPOCHS = 800
+EPOCHS = 1000
 BATCH_SIZE = 32
 LR = 3e-6
 VAL_SPLIT = 0.1
-DEPTH = 6
+DEPTH = 3
 D_MODEL = 768
 
 def train_one_epoch(
@@ -121,6 +121,13 @@ def main() -> None:
         "Supports column slicing with [:N], [M:], [M:N]. "
         "If omitted, uses the action_key attribute from the zarr metadata.",
     )
+    parser.add_argument(
+        "--load-model",
+        type=Path,
+        nargs="+",
+        default=None,
+        help="Path to model checkpoint to load from"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     args = parser.parse_args()
 
@@ -183,12 +190,26 @@ def main() -> None:
         depth=DEPTH
     ).to(device)
 
-    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Model parameters: {n_params:,}")
+    start_epoch = 1
 
     # TODO: implement an optimizer and scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, EPOCHS)
+
+    if (args.load_model[0]):
+        # Load the checkpoint
+        checkpoint = torch.load(args.load_model[0], weights_only=False)
+
+        # Load the model and optimizer states
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint['epoch']
+        for g in optimizer.param_groups:
+            g['lr'] = LR * 1e-1
+
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Model parameters: {n_params:,}")
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, EPOCHS, eta_min=3e-8)
 
     # ── training loop ─────────────────────────────────────────────────
     best_val = float("inf")
@@ -218,7 +239,7 @@ def main() -> None:
     save_path = ckpt_dir / save_name
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
-    for epoch in range(1, EPOCHS + 1):
+    for epoch in range(start_epoch, EPOCHS + 1):
         train_loss = train_one_epoch(model, train_loader, optimizer, device)
         val_loss = evaluate(model, val_loader, device)
         scheduler.step()
