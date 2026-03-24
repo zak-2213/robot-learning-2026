@@ -19,17 +19,14 @@ class BasePolicy(nn.Module, metaclass=abc.ABCMeta):
         self.chunk_size = chunk_size
 
     @abc.abstractmethod
-    def compute_loss(
-        self, state: torch.Tensor, action_chunk: torch.Tensor
-    ) -> torch.Tensor:
+    def compute_loss(self, state: torch.Tensor, action_chunk: torch.Tensor) -> torch.Tensor:
         """Compute training loss for a batch."""
+        raise NotImplementedError
 
     @abc.abstractmethod
-    def sample_actions(
-        self,
-        state: torch.Tensor,
-    ) -> torch.Tensor:
+    def sample_actions(self, state: torch.Tensor) -> torch.Tensor:
         """Generate a chunk of actions with shape (batch, chunk_size, action_dim)."""
+        raise NotImplementedError
 
 
 # TODO: Students implement ObstaclePolicy here.
@@ -66,11 +63,11 @@ class ObstaclePolicy(BasePolicy):
 
     def compute_loss(
         self,
-        predictions: torch.Tensor,
-        actions: torch.Tensor
+        state: torch.Tensor,
+        action_chunk: torch.Tensor
     ) -> torch.Tensor:
-        assert predictions.shape == actions.shape, f"Predictions and actions should have the same shape, have shapes {predictions.shape} and {actions.shape} respectively instead"
-        return torch.nn.functional.mse_loss(predictions, actions)
+        assert state.shape == action_chunk.shape, f"States and actions should have the same shape, have shapes {state.shape} and {action_chunk.shape} respectively instead"
+        return torch.nn.functional.mse_loss(state, action_chunk)
 
     @torch.no_grad()
     def sample_actions(
@@ -101,12 +98,12 @@ class MultiTaskPolicy(BasePolicy):
 
     def compute_loss(
         self,
-        predictions: torch.Tensor,
-        actions: torch.Tensor
+        state: torch.Tensor,
+        action_chunk: torch.Tensor
     ) -> torch.Tensor:
-        assert predictions.shape == actions.shape, f"Predictions and actions should have the same shape, have shapes {predictions.shape} and {actions.shape} respectively instead"
-        loss_ee = nn.functional.mse_loss(predictions[:][:][:3], actions[:][:][:3])
-        loss_gripper = nn.functional.mse_loss(predictions[:][:][-1], actions[:][:][-1])
+        assert state.shape == action_chunk.shape, f"States and actions should have the same shape, have shapes {state.shape} and {action_chunk.shape} respectively instead"
+        loss_ee = nn.functional.mse_loss(state[:][:][:3], action_chunk[:][:][:3])
+        loss_gripper = nn.functional.mse_loss(state[:][:][-1], action_chunk[:][:][-1])
         return loss_ee + 2 * loss_gripper
 
     @torch.no_grad()
