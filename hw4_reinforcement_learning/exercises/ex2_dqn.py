@@ -38,7 +38,7 @@ class ReplayBuffer:
             done (bool): whether the episode terminates after this transition
         """
         # TODO: Append the transition to the replay buffer.                  
-        raise NotImplementedError
+        self.buffer.append((state, action, reward, next_state, done))
 
     def sample(self, batch_size):
         """
@@ -108,7 +108,10 @@ class QNet(torch.nn.Module):
         """
         # TODO: Implement the forward pass of the network.         
         # Use ReLU after the first linear layer.                   
-        raise NotImplementedError
+        x = self.fc1(x)
+        x = F.relu(x)
+        out = self.fc2(x)
+        return out
 
 
 class DQN:
@@ -169,7 +172,11 @@ class DQN:
         # - For exploitation, convert the state to a torch tensor
         #   of shape (1, state_dim), move it to `self.device`,
         #   and choose the action with the largest Q-value.
-        raise NotImplementedError
+        if self.epsilon > np.random.random():
+            return np.random.choice(self.action_dim)
+        else:
+            return self.predict_action(state)
+            
 
     def predict_action(self, state):
         """
@@ -224,7 +231,7 @@ class DQN:
             # Hint:
             # - Use the target network for next-state values.
             # - DQN target: r + gamma * max_a' Q_target(s', a') * (1 - done)
-            raise NotImplementedError
+            q_targets = rewards + self.gamma * self.target_q_net(next_states).max(dim=1, keepdim=True)[0] * (1 - dones)
 
         # Compute DQN loss
         dqn_loss = torch.mean(F.mse_loss(q_values, q_targets))
