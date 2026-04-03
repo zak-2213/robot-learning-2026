@@ -174,8 +174,8 @@ class SACAgent:
             # 6. Compute the MSE losses against the target Q value for both Q-networks, average them to get critic_loss
             next_action, next_logp = self.actor.act(next_obs)
             q1_next, q2_next = self.critic_target(next_obs, next_action)
-            q_next = torch.min(q1_next, q2_next)
-            target_q = rew + self.gamma * (1 - done) * q_next - self.alpha * next_logp
+            q_next = torch.min(q1_next, q2_next).squeeze(-1)
+            target_q = rew + self.gamma * (1 - done) * (q_next - self.alpha * next_logp)
 
         q1_pred, q2_pred = self.critic(obs, act)
         critic_loss = 0.5 * (torch.square(q1_pred - target_q).mean() + torch.square(q2_pred - target_q).mean())
@@ -204,9 +204,9 @@ class SACAgent:
         # 2. Take the minimum Q-value
         # 3. Use the objective:
         #       mean(alpha * logp_new - q_new)
-        q1_new, q2_new = self.critic_target(obs, act_new)
+        q1_new, q2_new = self.critic(obs, act_new)
         q_new = torch.min(q1_new, q2_new)
-        actor_loss = (self.alpha * logp_new - q_new).mean()
+        actor_loss = (self.alpha.detach() * logp_new - q_new).mean()
 
         return actor_loss
 
@@ -283,7 +283,7 @@ class SACAgent:
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        act_new, logp_new = self.actor.act(next_obs)
+        act_new, logp_new = self.actor.act(obs)
 
         actor_loss = self.compute_actor_loss(obs, act_new, logp_new)
         self.actor_optimizer.zero_grad()
